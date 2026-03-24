@@ -4,11 +4,14 @@ import org.scalatest.freespec.AnyFreeSpec
 
 class MonadSpec extends AnyFreeSpec {
   "Monad" - {
-    val optionMonad: Monad[Option] = new Monad[Option] {
-      override def point[A]: (=> A) => Option[A] = Some(_)
-
-      override def bind[A, B]: Option[A] => (A => Option[B]) => Option[B] = _.flatMap
-    }
+    val optionMonad: Monad[Option] = Monad.fromPoint(
+      new Point[Option] {
+        override def point[A](a: => A): Option[A] = Some(a)
+      },
+      new Bind[Option] {
+        override def bind[A, B](fa: Option[A])(f: A => Option[B]): Option[B] = fa.flatMap(f)
+      }
+    )
 
     "ap" - {
       "returns ap result" in {
@@ -22,7 +25,7 @@ class MonadSpec extends AnyFreeSpec {
       "returns map2 result" in {
         val oa = Option("4")
         val ob = Option(2)
-        val actual = optionMonad.map2(oa)(ob)((a, b) => (a + b.toString).toDouble)
+        val actual = optionMonad.map2(oa, ob)((a, b) => (a + b.toString).toDouble)
         assert(actual === Option(42d))
       }
     }
