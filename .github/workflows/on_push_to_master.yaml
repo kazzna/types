@@ -1,0 +1,52 @@
+name: Publish SNAPSHOT to GitHub Packages on master
+
+on:
+  workflow_run:
+    workflows:
+      - On Push
+    types:
+      - completed
+
+jobs:
+  publish-snapshot:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' }}
+
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-java@v3.0.0
+        with:
+          distribution: temurin
+          # renovate: datasource=java-version packageName=java
+          java-version: 21.0.10+7.0.LTS
+
+      - uses: sbt/setup-sbt@6bec67c98f542b9e17369bfca0ec822ac1363194 # v1.1.19
+
+      - name: Check if version is SNAPSHOT
+        id: check_snapshot
+        shell: bash
+        run: |
+          VERSION=$(sbt -Dsbt.log.noformat=true "print version" | tail -1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [[ "$VERSION" == *"SNAPSHOT"* ]]; then
+            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "Version is SNAPSHOT: $VERSION"
+          else
+            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "Version is not SNAPSHOT (skipping publish): $VERSION"
+          fi
+
+      - name: Publish to GitHub Packages
+        if: steps.check_snapshot.outputs.is_snapshot == 'true'
+        shell: bash
+        run: sbt publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
