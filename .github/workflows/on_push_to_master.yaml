@@ -30,12 +30,14 @@ jobs:
 
       - uses: sbt/setup-sbt@6bec67c98f542b9e17369bfca0ec822ac1363194 # v1.1.19
 
-      - name: Check if version is SNAPSHOT
-        id: check_snapshot
+      - name: Determine package metadata and SNAPSHOT
+        id: pkg_meta
         shell: bash
         run: |
           VERSION=$(sbt -Dsbt.log.noformat=true "print version" | tail -1)
+          NAME=$(sbt -Dsbt.log.noformat=true "print name" | tail -1)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
           if [[ "$VERSION" == *"SNAPSHOT"* ]]; then
             echo "is_snapshot=true" >> $GITHUB_OUTPUT
             echo "Version is SNAPSHOT: $VERSION"
@@ -44,9 +46,56 @@ jobs:
             echo "Version is not SNAPSHOT (skipping publish): $VERSION"
           fi
 
-      - name: Publish to GitHub Packages
-        if: steps.check_snapshot.outputs.is_snapshot == 'true'
+      - name: Delete existing SNAPSHOT version if exists
+        if: steps.pkg_meta.outputs.is_snapshot == 'true'
         shell: bash
-        run: sbt publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE_NAME: ${{ steps.pkg_meta.outputs.name }}
+          PACKAGE_TYPE: maven
+          VERSION: ${{ steps.pkg_meta.outputs.version }}
+        run: |
+          echo "Looking for package $PACKAGE_NAME and version $VERSION"
+
+          pkg_id=$(gh api -H "Accept: application/vnd.github+json" \
+            /orgs/$OWNER/packages?package_type=$PACKAGE_TYPE \
+            --jq ".[] | select(.name==\"$PACKAGE_NAME\") | .id")
+
+          if [ -z "$pkg_id" ]; then
+            pkg_id=$(gh api -H "Accept: application/vnd.github+json" \
+              /users/$OWNER/packages?package_type=$PACKAGE_TYPE \
+              --jq ".[] | select(.name==\"$PACKAGE_NAME\") | .id")
+          fi
+
+          if [ -z "$pkg_id" ]; then
+            echo "Package not found in org/users scope; skipping delete."
+            exit 0
+          fi
+
+          VERSION_ID=$(gh api -H "Accept: application/vnd.github+json" \
+            /orgs/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions \
+            --jq ".[] | select(.name==\"$VERSION\") | .id")
+
+          if [ -z "$VERSION_ID" ]; then
+            VERSION_ID=$(gh api -H "Accept: application/vnd.github+json" \
+              /users/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions \
+              --jq ".[] | select(.name==\"$VERSION\") | .id")
+          fi
+
+          if [ -n "$VERSION_ID" ]; then
+            echo "Deleting existing version $VERSION ($VERSION_ID)"
+            gh api --method DELETE -H "Accept: application/vnd.github+json" \
+              /orgs/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$VERSION_ID || \
+            gh api --method DELETE -H "Accept: application/vnd.github+json" \
+              /users/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$VERSION_ID
+          else
+            echo "No existing version found; no deletion needed."
+          fi
+
+      - name: Publish to GitHub Packages
+        if: steps.pkg_meta.outputs.is_snapshot == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: sbt publish
