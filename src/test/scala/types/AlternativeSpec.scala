@@ -4,23 +4,28 @@ import org.scalatest.freespec.AnyFreeSpec
 
 class AlternativeSpec extends AnyFreeSpec {
   "Alternative" - {
-    val listAlternative: Alternative[List] = new Alternative[List] {
-      override def point[A]: (=> A) => List[A] = List(_)
-
-      override def ap[A, B]: List[A] => List[A => B] => List[B] = fa =>
-        ff =>
-          for {
-            a <- fa
-            f <- ff
-          } yield f(a)
-
-      override def map2[A, B, C]: List[A] => List[B] => ((A, B) => C) => List[C] =
-        Alternative.map2FromPointAndAp(point, ap, ap)
-
-      override def empty[A]: List[A] = List.empty
-
-      override def plus[A]: List[A] => (=> List[A]) => List[A] = fa => fa ++ _
-    }
+    val listAlternative: Alternative[List] = Alternative.from(
+      Applicative.fromMap2(
+        new Functor[List] {
+          override def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+        },
+        new Point[List] {
+          override def point[A](a: => A): List[A] = List(a)
+        },
+        new Map2[List] {
+          override def map2[A, B, C](fa: List[A], fb: List[B])(f: (A, B) => C): List[C] =
+            fa.flatMap(a => fb.map(b => f(a, b)))
+        }
+      ),
+      PlusEmpty.from(
+        new Plus[List] {
+          override def plus[A](fa1: List[A], fa2: => List[A]): List[A] = fa1 ++ fa2
+        },
+        new Empty[List] {
+          override def empty[A]: List[A] = List.empty
+        }
+      )
+    )
 
     "combine" - {
       "returns constructed value" in {

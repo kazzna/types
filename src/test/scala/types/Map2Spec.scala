@@ -7,31 +7,29 @@ class Map2Spec extends AnyFreeSpec {
     implicit def monoid[A]: Monoid[List[A]] = new Monoid[List[A]] {
       override def zero: List[A] = List.empty
 
-      override def append: List[A] => (=> List[A]) => List[A] = a => a ++ _
+      override def append(a1: List[A], a2: => List[A]): List[A] = a1 ++ a2
     }
 
-    implicit def withMonoid[M](implicit M: Monoid[M]): Map2[Either[M, *]] = new Map2[Either[M, *]] {
-      override def map2[A, B, C]: Either[M, A] => Either[M, B] => ((A, B) => C) => Either[M, C] =
-        fa => fb => f => fa.left.map(M.append(_)(fb.map(_ => M.zero).merge)).flatMap(a => fb.map(b => f(a, b)))
-
-      override def ap[A, B]: Either[M, A] => Either[M, A => B] => Either[M, B] = Map2.apFromMap2(map2)
+    given withMonoid[E](using monoid: Monoid[E]): Map2[[A] =>> Either[E, A]] = new Map2[[A] =>> Either[E, A]] {
+      override def map2[A, B, C](fa: Either[E, A], fb: Either[E, B])(f: (A, B) => C): Either[E, C] =
+        fa.left.map(monoid.append(_, fb.map(_ => monoid.zero).merge)).flatMap(a => fb.map(b => f(a, b)))
     }
 
     "ap" - {
       "returns mapped value" in {
         val fa: Either[List[String], Int] = Right(21)
         val ff: Either[List[String], Int => String] = Right(i => (i * 2).toString)
-        val map2 = Map2[Either[List[String], *]]
+        val map2 = Map2[[A] =>> Either[List[String], A]]
 
-        assert(map2.ap(fa)(ff) === Right("42"))
+        assert(Apply.fromMap2(using map2).ap(fa)(ff) === Right("42"))
       }
 
       "merges given errors" in {
         val fa: Either[List[String], Int] = Left(List("1st error"))
         val ff: Either[List[String], Int => String] = Left(List("2nd error"))
-        val map2 = Map2[Either[List[String], *]]
+        val map2 = Map2[[A] =>> Either[List[String], A]]
 
-        assert(map2.ap(fa)(ff) === Left(List("1st error", "2nd error")))
+        assert(Apply.fromMap2(using map2).ap(fa)(ff) === Left(List("1st error", "2nd error")))
       }
     }
   }

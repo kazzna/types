@@ -1,9 +1,7 @@
 package types
 
 trait Bind[F[_]] {
-  def bind[A, B]: F[A] => (A => F[B]) => F[B]
-
-  def flatten[A]: F[F[A]] => F[A] = bind(_)(identity)
+  def bind[A, B](fa: F[A])(f: A => F[B]): F[B]
 }
 
 object Bind {

@@ -1,0 +1,24 @@
+name: On Push
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.0.0
+
+      - uses: actions/setup-java@v3.0.0
+        with:
+          distribution: temurin
+          # renovate: datasource=java-version packageName=java
+          java-version: 21.0.10+7.0.LTS
+
+      - uses: sbt/setup-sbt@6bec67c98f542b9e17369bfca0ec822ac1363194 # v1.1.19
+
+      - name: Run compile and tests
+        shell: bash
+        run: sbt --verbose "+test"

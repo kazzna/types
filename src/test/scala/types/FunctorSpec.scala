@@ -5,11 +5,11 @@ import org.scalatest.freespec.AnyFreeSpec
 class FunctorSpec extends AnyFreeSpec {
   "Functor" - {
     val optionFunctor: Functor[Option] = new Functor[Option] {
-      override def map[A, B]: Option[A] => (A => B) => Option[B] = _.map
+      override def map[A, B](fa: Option[A])(f: (A => B)): Option[B] = fa.map(f)
     }
 
     val listFunctor: Functor[List] = new Functor[List] {
-      override def map[A, B]: List[A] => (A => B) => List[B] = _.map
+      override def map[A, B](fa: List[A])(f: (A => B)): List[B] = fa.map(f)
     }
 
     "pair" - {
@@ -29,7 +29,7 @@ class FunctorSpec extends AnyFreeSpec {
 
     "compose" - {
       "returns composed functor" in {
-        val composed = listFunctor.compose(optionFunctor)
+        val composed = Functor.compose(listFunctor, optionFunctor)
         val list = List(Some(1), Some(2), None, Some(4), Some(5))
         val expected = List(Some(1d), Some(2d), None, Some(4d), Some(5d))
         assert(composed.map(list)(_.toDouble) === expected)

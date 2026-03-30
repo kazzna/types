@@ -5,36 +5,39 @@ import org.scalatest.freespec.AnyFreeSpec
 class ApplicativeSpec extends AnyFreeSpec {
   "Applicative" - {
     implicit def monoid[A]: Monoid[List[A]] = new Monoid[List[A]] {
+      override def append(a1: List[A], a2: => List[A]): List[A] = a1 ++ a2
+
       override def zero: List[A] = List.empty
 
-      override def append: List[A] => (=> List[A]) => List[A] = fa => fa ++ _
     }
 
-    implicit def withMonoid[M: Monoid]: Applicative[Either[M, *]] = new Applicative[Either[M, *]] {
-      override def point[A]: (=> A) => Either[M, A] = Right(_)
+    given withMonoid[M: Monoid]: Applicative[[A] =>> Either[M, A]] = Applicative.fromMap2(
+      new Functor[[A] =>> Either[M, A]] {
+        override def map[A, B](fa: Either[M, A])(f: A => B): Either[M, B] = fa.map(f)
+      },
+      new Point[[A] =>> Either[M, A]] {
+        override def point[A](a: => A): Either[M, A] = Right(a)
+      },
+      new Map2[[A] =>> Either[M, A]] {
+        override def map2[A, B, C](fa: Either[M, A], fb: Either[M, B])(f: (A, B) => C): Either[M, C] =
+          fa.left.map(Monoid[M].append(_, fb.map(_ => Monoid[M].zero).merge)).flatMap(a => fb.map(b => f(a, b)))
+      }
+    )
 
-      override def ap[A, B]: Either[M, A] => Either[M, A => B] => Either[M, B] =
-        fa => ff => fa.left.map(Monoid[M].append(_)(ff.map(_ => Monoid[M].zero).merge)).flatMap(a => ff.map(_(a)))
+    val eitherApplicative = Applicative[[A] =>> Either[List[String], A]]
 
-      override def map2[A, B, C]: Either[M, A] => Either[M, B] => ((A, B) => C) => Either[M, C] =
-        Applicative.map2FromPointAndAp(point, ap, ap)
-    }
-
-    val eitherApplicative = Applicative[Either[List[String], *]]
-
-    val listApplicative: Applicative[List] = new Applicative[List] {
-      override def point[A]: (=> A) => List[A] = List(_)
-
-      override def ap[A, B]: List[A] => List[A => B] => List[B] = fa =>
-        ff =>
-          for {
-            a <- fa
-            f <- ff
-          } yield f(a)
-
-      override def map2[A, B, C]: List[A] => List[B] => ((A, B) => C) => List[C] =
-        Applicative.map2FromPointAndAp(point, ap, ap)
-    }
+    val listApplicative: Applicative[List] = Applicative.fromMap2(
+      new Functor[List] {
+        override def map[A, B](fa: List[A])(f: A => B): List[B] = fa.map(f)
+      },
+      new Point[List] {
+        override def point[A](a: => A): List[A] = List.apply(a)
+      },
+      new Map2[List] {
+        override def map2[A, B, C](fa: List[A], fb: List[B])(f: (A, B) => C): List[C] =
+          fa.flatMap(a => fb.map(b => f(a, b)))
+      }
+    )
 
     "map" - {
       "returns mapped value" in {
@@ -62,20 +65,20 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fa: Either[List[String], Int] = Right(42)
         val fb: Either[List[String], String] = Right("***")
         val f = (i: Int, s: String) => s"$s$i$s"
-        assert(eitherApplicative.map2(fa)(fb)(f) === Right("***42***"))
+        assert(eitherApplicative.map2(fa, fb)(f) === Right("***42***"))
       }
 
       "merges given errors" in {
         val fa: Either[List[String], Int] = Left(List("1st error"))
         val fb: Either[List[String], String] = Left(List("2nd error"))
         val f = (i: Int, s: String) => s"$s$i$s"
-        assert(eitherApplicative.map2(fa)(fb)(f) === Left(List("1st error", "2nd error")))
+        assert(eitherApplicative.map2(fa, fb)(f) === Left(List("1st error", "2nd error")))
       }
     }
 
     "compose" - {
-      val composed: Applicative[Lambda[A => List[Either[List[String], A]]]] =
-        listApplicative.compose(eitherApplicative)
+      val composed: Applicative[[A] =>> List[Either[List[String], A]]] =
+        Applicative.compose(listApplicative, eitherApplicative)
 
       "point" - {
         "returns composed point" in {
@@ -123,7 +126,7 @@ class ApplicativeSpec extends AnyFreeSpec {
             Right("*3*"),
             Right("-3-")
           )
-          assert(composed.map2(list1)(list2)(f) === expected)
+          assert(composed.map2(list1, list2)(f) === expected)
         }
       }
     }
@@ -134,7 +137,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fb: Either[List[String], String] = Right("***")
         val fc: Either[List[String], Double] = Right(21d)
         val f = (i: Int, s: String, d: Double) => s"$s${i + d}$s"
-        assert(eitherApplicative.map3(fa)(fb)(fc)(f) === Right("***42.0***"))
+        assert(eitherApplicative.map3(fa, fb, fc)(f) === Right("***42.0***"))
       }
 
       "merges given errors" in {
@@ -142,7 +145,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fb: Either[List[String], String] = Left(List("2nd error"))
         val fc: Either[List[String], Double] = Left(List("3rd error"))
         val f = (i: Int, s: String, d: Double) => s"$s${i + d}$s"
-        assert(eitherApplicative.map3(fa)(fb)(fc)(f) === Left(List("1st error", "2nd error", "3rd error")))
+        assert(eitherApplicative.map3(fa, fb, fc)(f) === Left(List("1st error", "2nd error", "3rd error")))
       }
 
       "skips value when error occurred" in {
@@ -150,7 +153,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fb: Either[List[String], String] = Right("abc")
         val fc: Either[List[String], Double] = Left(List("3rd error"))
         val f = (i: Int, s: String, d: Double) => s"$s${i + d}$s"
-        assert(eitherApplicative.map3(fa)(fb)(fc)(f) === Left(List("1st error", "3rd error")))
+        assert(eitherApplicative.map3(fa, fb, fc)(f) === Left(List("1st error", "3rd error")))
       }
     }
 
@@ -161,7 +164,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fc: Either[List[String], Double] = Right(21d)
         val fd: Either[List[String], Int] = Right(2)
         val f = (i: Int, s: String, d: Double, j: Int) => LazyList.fill(j)(s"$s${i + d}$s").mkString("")
-        assert(eitherApplicative.map4(fa)(fb)(fc)(fd)(f) === Right("***42.0******42.0***"))
+        assert(eitherApplicative.map4(fa, fb, fc, fd)(f) === Right("***42.0******42.0***"))
       }
 
       "merges given errors" in {
@@ -171,7 +174,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fd: Either[List[String], Int] = Left(List("4th error"))
         val f = (i: Int, s: String, d: Double, j: Int) => LazyList.fill(j)(s"$s${i + d}$s").mkString("")
         val expected = Left(List("1st error", "2nd error", "3rd error", "4th error"))
-        assert(eitherApplicative.map4(fa)(fb)(fc)(fd)(f) === expected)
+        assert(eitherApplicative.map4(fa, fb, fc, fd)(f) === expected)
       }
 
       "skips value when error occurred" in {
@@ -181,7 +184,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fd: Either[List[String], Int] = Left(List("4th error"))
         val f = (i: Int, s: String, d: Double, j: Int) => LazyList.fill(j)(s"$s${i + d}$s").mkString("")
         val expected = Left(List("1st error", "3rd error", "4th error"))
-        assert(eitherApplicative.map4(fa)(fb)(fc)(fd)(f) === expected)
+        assert(eitherApplicative.map4(fa, fb, fc, fd)(f) === expected)
       }
     }
 
@@ -194,7 +197,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fe: Either[List[String], Boolean] = Right(false)
         val f = (i: Int, s: String, d: Double, j: Int, b: Boolean) => LazyList.fill(j)(s"$s${i + d}$b").mkString("")
         val expected = Right("***42.0false***42.0false")
-        val actual = eitherApplicative.map5(fa)(fb)(fc)(fd)(fe)(f)
+        val actual = eitherApplicative.map5(fa, fb, fc, fd, fe)(f)
         assert(actual === expected)
       }
 
@@ -206,7 +209,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fe: Either[List[String], Boolean] = Left(List("5th error"))
         val f = (i: Int, s: String, d: Double, j: Int, b: Boolean) => LazyList.fill(j)(s"$s${i + d}$b").mkString("")
         val expected = Left(List("1st error", "2nd error", "3rd error", "4th error", "5th error"))
-        val actual = eitherApplicative.map5(fa)(fb)(fc)(fd)(fe)(f)
+        val actual = eitherApplicative.map5(fa, fb, fc, fd, fe)(f)
         assert(actual === expected)
       }
 
@@ -218,7 +221,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val fe: Either[List[String], Boolean] = Left(List("5th error"))
         val f = (i: Int, s: String, d: Double, j: Int, b: Boolean) => LazyList.fill(j)(s"$s${i + d}$b").mkString("")
         val expected = Left(List("1st error", "3rd error", "5th error"))
-        val actual = eitherApplicative.map5(fa)(fb)(fc)(fd)(fe)(f)
+        val actual = eitherApplicative.map5(fa, fb, fc, fd, fe)(f)
         assert(actual === expected)
       }
     }
@@ -234,7 +237,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val f = (i: Int, s: String, d: Double, j: Int, b: Boolean, c: Char) =>
           LazyList.fill(j)(s"$s${i + d}$b$c").mkString("")
         val expected = Right("***42.0false!***42.0false!")
-        val actual = eitherApplicative.map6(fa)(fb)(fc)(fd)(fe)(fg)(f)
+        val actual = eitherApplicative.map6(fa, fb, fc, fd, fe, fg)(f)
         assert(actual === expected)
       }
 
@@ -248,7 +251,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val f = (i: Int, s: String, d: Double, j: Int, b: Boolean, c: Char) =>
           LazyList.fill(j)(s"$s${i + d}$b$c").mkString("")
         val expected = Left(List("1st error", "2nd error", "3rd error", "4th error", "5th error", "6th error"))
-        val actual = eitherApplicative.map6(fa)(fb)(fc)(fd)(fe)(fg)(f)
+        val actual = eitherApplicative.map6(fa, fb, fc, fd, fe, fg)(f)
         assert(actual === expected)
       }
 
@@ -262,7 +265,7 @@ class ApplicativeSpec extends AnyFreeSpec {
         val f = (i: Int, s: String, d: Double, j: Int, b: Boolean, c: Char) =>
           LazyList.fill(j)(s"$s${i + d}$b$c").mkString("")
         val expected = Left(List("1st error", "3rd error", "5th error", "6th error"))
-        val actual = eitherApplicative.map6(fa)(fb)(fc)(fd)(fe)(fg)(f)
+        val actual = eitherApplicative.map6(fa, fb, fc, fd, fe, fg)(f)
         assert(actual === expected)
       }
     }

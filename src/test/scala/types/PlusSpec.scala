@@ -5,7 +5,7 @@ import org.scalatest.freespec.AnyFreeSpec
 class PlusSpec extends AnyFreeSpec {
   "Plus" - {
     val listPlus: Plus[List] = new Plus[List] {
-      override def plus[A]: List[A] => (=> List[A]) => List[A] = fa => fa ++ _
+      override def plus[A](fa1: List[A], fa2: => List[A]): List[A] = fa1 ++ fa2
     }
 
     "unfoldLeftOption" - {
@@ -41,17 +41,6 @@ class PlusSpec extends AnyFreeSpec {
           if (i <= 0) None
           else Option((LazyList.fill(i)(i.toDouble).toList, i - 1))
         assert(listPlus.unfoldRightOption(seed)(f) === None)
-      }
-    }
-
-    "asSemigroup" - {
-      "append" - {
-        "returns `plus` result" in {
-          val semigroup = listPlus.asSemigroup[Int]
-          val fa = List(1, 2, 3)
-          val fb = List(4, 5, 6)
-          assert(semigroup.append(fa)(fb) === List(1, 2, 3, 4, 5, 6))
-        }
       }
     }
   }

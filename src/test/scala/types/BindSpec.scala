@@ -4,15 +4,16 @@ import org.scalatest.freespec.AnyFreeSpec
 
 class BindSpec extends AnyFreeSpec {
   "Bind" - {
-    val bind: Bind[List] = new Bind[List] {
-      override def bind[A, B]: List[A] => (A => List[B]) => List[B] = fa => fa.flatMap(_)
+    given bind: Bind[List] = new Bind[List] {
+      override def bind[A, B](fa: List[A])(f: A => List[B]): List[B] = fa.flatMap(f)
     }
 
-    "flatten" - {
-      "returns flatten object" in {
-        val list: List[List[Int]] = List(List(1, 2, 3), List(4, 5), List(6, 7, 8))
-        val expected = List(1, 2, 3, 4, 5, 6, 7, 8)
-        assert(bind.flatten(list) === expected)
+    "bind" - {
+      "returns bound object" in {
+        val fa: List[Int] = List(1, 2, 3)
+        val f: Int => List[Long] = i => List(i * 1, i * 2, i * 3)
+        val expected: List[Double] = List(1, 2, 3, 2, 4, 6, 3, 6, 9)
+        assert(bind.bind(fa)(f) === expected)
       }
     }
   }

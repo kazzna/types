@@ -1,18 +1,21 @@
 ThisBuild / organization := "jp.kazzna"
-ThisBuild / scalaVersion := "2.13.8"
+ThisBuild / scalaVersion := "3.8.2"
+ThisBuild / publishTo := Some("GitHub Package Registry" at "https://maven.pkg.github.com/kazzna/types")
+ThisBuild / credentials ++= (sys.env.get("GITHUB_TOKEN") match {
+  case Some(token) => Seq(Credentials("GitHub Package Registry", "maven.pkg.github.com", "kazzna", token))
+  case None => Seq()
+})
 
 lazy val root = (project in file("."))
   .settings(
     name := "types",
-    version := "0.1.0",
+    version := "0.1.0-SNAPSHOT",
     scalacOptions ++= Seq(
       "--deprecation",
-      "--feature"
+      "--feature",
+      "--unchecked"
     ),
     libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % "3.2.15" % "test"
-    ),
-    Test / testOptions += Tests.Argument("-l", "org.scalatest.tags.Slow")
+      "org.scalatest" %% "scalatest" % "3.2.19" % "test"
+    )
   )
-
-addCompilerPlugin("org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full)
