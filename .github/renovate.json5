@@ -4,4 +4,41 @@
     "config:best-practices",
     ":disableDependencyDashboard",
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update version-like values in GitHub Actions workflows",
+      "managerFilePatterns": ["/^\\.github\\/workflows\\/.*\\.ya?ml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s+(?:[\\S]+[_-])?(?:VERSION|version)\\s*:\\s*(?<currentValue>[\\S]+?)\\s",
+      ],
+    },
+  ],
+  "packageRules": [
+    {
+      "description": "Keep eclipse-temurin JDK images on Java 21 and group as java",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["eclipse-temurin"],
+      "matchCurrentValue": "/jre/",
+      "allowedVersions": "/^21([._].+)?-jre([.-].+)?$/",
+      "groupName": "java",
+      "groupSlug": "java",
+    },
+    {
+      "description": "Keep Java runtime versions on JRE 21 and group as java",
+      "matchDatasources": ["java-version"],
+      "allowedVersions": "/^21([._]|$)/",
+      "groupName": "java",
+      "groupSlug": "java",
+    },
+    {
+      "description": "Treat sbtscala/scala-sbt image tags as Java 21-based and group as java",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["sbtscala/scala-sbt"],
+      "versioning": "regex:^eclipse-temurin-alpine-(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)_(?<build>\\d+)(?:_\\d+\\.\\d+\\.\\d+_\\d+\\.\\d+\\.\\d+)?$",
+      "allowedVersions": "/^eclipse-temurin-alpine-21([._]|$)/",
+      "groupName": "java",
+      "groupSlug": "java",
+    },
+  ],
 }
