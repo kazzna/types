@@ -1,5 +1,6 @@
 ThisBuild / organization := "jp.kazzna"
 ThisBuild / scalaVersion := "3.8.2"
+ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / publishTo := Some("GitHub Package Registry" at "https://maven.pkg.github.com/kazzna/types")
 ThisBuild / credentials ++= (sys.env.get("GITHUB_TOKEN") match {
   case Some(token) => Seq(Credentials("GitHub Package Registry", "maven.pkg.github.com", "kazzna", token))
