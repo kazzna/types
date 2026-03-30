@@ -38,15 +38,17 @@ jobs:
         run: |
           VERSION=$(sbt -Dsbt.log.noformat=true "print version" | tail -1)
           NAME=$(sbt -Dsbt.log.noformat=true "print name" | tail -1)
+          ORGANIZATION=$(sbt -Dsbt.log.noformat=true "print organization" | tail -1)
           SCALA_BINARY_VERSION=$(sbt -Dsbt.log.noformat=true "print scalaBinaryVersion" | tail -1)
 
-          PACKAGE_NAME="$NAME"
+          PACKAGE_NAME="$ORGANIZATION.$NAME"
           if [ -n "$SCALA_BINARY_VERSION" ]; then
-            PACKAGE_NAME="${NAME}_${SCALA_BINARY_VERSION}"
+            PACKAGE_NAME="${ORGANIZATION}.${NAME}_${SCALA_BINARY_VERSION}"
           fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "organization=$ORGANIZATION" >> $GITHUB_OUTPUT
           echo "scala_binary_version=$SCALA_BINARY_VERSION" >> $GITHUB_OUTPUT
           echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
 
