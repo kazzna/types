@@ -56,37 +56,23 @@ jobs:
           PACKAGE_TYPE: maven
           VERSION: ${{ steps.pkg_meta.outputs.version }}
         run: |
-          echo "Looking for package $PACKAGE_NAME and version $VERSION"
+          echo "Looking for package `$PACKAGE_NAME:$VERSION`"
 
-          pkg_id=$(gh api -H "Accept: application/vnd.github+json" \
-            /orgs/$OWNER/packages?package_type=$PACKAGE_TYPE \
+          PACKAGE_ID=$(gh api -H "Accept: application/vnd.github+json" \
+            /users/$OWNER/packages?package_type=$PACKAGE_TYPE \
             --jq ".[] | select(.name==\"$PACKAGE_NAME\") | .id")
 
-          if [ -z "$pkg_id" ]; then
-            pkg_id=$(gh api -H "Accept: application/vnd.github+json" \
-              /users/$OWNER/packages?package_type=$PACKAGE_TYPE \
-              --jq ".[] | select(.name==\"$PACKAGE_NAME\") | .id")
-          fi
-
-          if [ -z "$pkg_id" ]; then
+          if [ -z "$PACKAGE_ID" ]; then
             echo "Package not found in org/users scope; skipping delete."
             exit 0
           fi
 
           VERSION_ID=$(gh api -H "Accept: application/vnd.github+json" \
-            /orgs/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions \
+            /users/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions \
             --jq ".[] | select(.name==\"$VERSION\") | .id")
-
-          if [ -z "$VERSION_ID" ]; then
-            VERSION_ID=$(gh api -H "Accept: application/vnd.github+json" \
-              /users/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions \
-              --jq ".[] | select(.name==\"$VERSION\") | .id")
-          fi
 
           if [ -n "$VERSION_ID" ]; then
             echo "Deleting existing version $VERSION ($VERSION_ID)"
-            gh api --method DELETE -H "Accept: application/vnd.github+json" \
-              /orgs/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$VERSION_ID || \
             gh api --method DELETE -H "Accept: application/vnd.github+json" \
               /users/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$VERSION_ID
           else
