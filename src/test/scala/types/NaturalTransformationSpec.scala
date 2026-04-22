@@ -93,6 +93,19 @@ class NaturalTransformationSpec extends AnyFreeSpec {
       assert(composed(Some(1)) === Seq(1))
       assert(composed(Option.empty[Int]) === Seq.empty)
     }
+
+    "reflect returns a NaturalTransformation that returns the same reference as the argument" in {
+      val reflect = NaturalTransformation.reflect[Option]
+
+      val a = Some(1)
+      assert(reflect(a) eq a)
+
+      val b = Option.empty[String]
+      assert(reflect(b) eq b)
+
+      val reflectList = NaturalTransformation.reflect[List]
+      val c = List("a", "b", "c")
+      assert(reflectList(c) eq c)
+    }
   }
 }
-
