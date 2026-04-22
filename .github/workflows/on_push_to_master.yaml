@@ -1,0 +1,111 @@
+name: Publish SNAPSHOT to GitHub Packages on master
+
+on:
+  workflow_run:
+    workflows:
+      - On Push
+    branches:
+      - master
+    types:
+      - completed
+
+jobs:
+  publish-snapshot:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          # renovate: datasource=java-version packageName=java
+          java-version: 21.0.10+7.0.LTS
+
+      - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
+
+      - name: Determine package metadata and SNAPSHOT
+        id: pkg_meta
+        shell: bash
+        run: |
+          VERSION=$(sbt -Dsbt.log.noformat=true "print version" | tail -1)
+          NAME=$(sbt -Dsbt.log.noformat=true "print name" | tail -1)
+          ORGANIZATION=$(sbt -Dsbt.log.noformat=true "print organization" | tail -1)
+          SCALA_BINARY_VERSION=$(sbt -Dsbt.log.noformat=true "print scalaBinaryVersion" | tail -1)
+
+          PACKAGE_NAME="$ORGANIZATION.$NAME"
+          if [ -n "$SCALA_BINARY_VERSION" ]; then
+            PACKAGE_NAME="${ORGANIZATION}.${NAME}_${SCALA_BINARY_VERSION}"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+          echo "organization=$ORGANIZATION" >> $GITHUB_OUTPUT
+          echo "scala_binary_version=$SCALA_BINARY_VERSION" >> $GITHUB_OUTPUT
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" == *"SNAPSHOT"* ]]; then
+            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "Version is SNAPSHOT: $VERSION"
+          else
+            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "Version is not SNAPSHOT (skipping publish): $VERSION"
+          fi
+
+      - name: Delete existing SNAPSHOT version if exists
+        if: steps.pkg_meta.outputs.is_snapshot == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE_NAME: ${{ steps.pkg_meta.outputs.package_name }}
+          PACKAGE_TYPE: maven
+          SCOPE: users
+          VERSION: ${{ steps.pkg_meta.outputs.version }}
+        run: |
+          echo "Looking for package `$PACKAGE_NAME:$VERSION`"
+
+          PACKAGE_ID=$(gh api -H "Accept: application/vnd.github+json" \
+            /$SCOPE/$OWNER/packages?package_type=$PACKAGE_TYPE \
+            --jq ".[] | select(.name==\"$PACKAGE_NAME\") | .id")
+
+          if [ -z "$PACKAGE_ID" ]; then
+            echo "Package not found in org/users scope; skipping delete."
+            exit 0
+          fi
+
+          VERSIONS_JSON=$(gh api -H "Accept: application/vnd.github+json" \
+            /$SCOPE/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions)
+
+          VERSION_COUNT=$(echo "$VERSIONS_JSON" | jq 'length')
+          VERSION_ID=$(echo "$VERSIONS_JSON" | jq -r --arg VER "$VERSION" '.[] | select(.name==$VER) | .id')
+
+          if [ -z "$VERSION_ID" ]; then
+            echo "No existing version found; no deletion needed."
+            exit 0
+          fi
+
+          if [ "$VERSION_COUNT" -le 1 ]; then
+            echo "Version count is $VERSION_COUNT (last version); deleting package $PACKAGE_NAME"
+            gh api --method DELETE -H "Accept: application/vnd.github+json" \
+              /$SCOPE/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME
+          else
+            echo "Version count is $VERSION_COUNT; deleting version $VERSION ($VERSION_ID)"
+            gh api --method DELETE -H "Accept: application/vnd.github+json" \
+              /$SCOPE/$OWNER/packages/$PACKAGE_TYPE/$PACKAGE_NAME/versions/$VERSION_ID
+          fi
+
+      - name: Publish to GitHub Packages
+        if: steps.pkg_meta.outputs.is_snapshot == 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: sbt publish

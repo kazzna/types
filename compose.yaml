@@ -1,0 +1,8 @@
+services:
+  development:
+    image: sbtscala/scala-sbt:eclipse-temurin-alpine-21.0.8_9_1.12.5_3.8.2@sha256:3f99c0b17143d98bc8924b655a8fbb61135ee6a674d5031d35c1610934e8e138
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+    working_dir: /app
