@@ -43,7 +43,7 @@ trait NaturalTransformation[F[_], G[_]] {
     * @return
     *   A new natural transformation from `F` to `H` representing the composed effect
     */
-  final def andThen[H[_]](that: G ~> H): F ~> H = NaturalTransformation.Sequence(this, that)
+  final def andThen[H[_]](that: G ~> H): F ~> H = that.compose(this)
 
   /** Composes this natural transformation with another in reverse order.
     *
@@ -52,6 +52,9 @@ trait NaturalTransformation[F[_], G[_]] {
     * method facilitates the right-to-left composition of transformations, which may be more natural in certain
     * contexts.
     *
+    * If either transformation is the identity transformation `reflect`, this method returns the non-identity
+    * transformation without creating an additional sequence, thereby optimising the composition.
+    *
     * @tparam E
     *   The source type constructor of the provided transformation
     * @param that
@@ -59,7 +62,11 @@ trait NaturalTransformation[F[_], G[_]] {
     * @return
     *   A new natural transformation from `E` to `G` representing the composed effect
     */
-  final def compose[E[_]](that: E ~> F): E ~> G = NaturalTransformation.Sequence(that, this)
+  final def compose[E[_]](that: E ~> F): E ~> G = (that, this) match {
+    case (_: NaturalTransformation.Reflect[_], _) => this.asInstanceOf[E ~> G]
+    case (_, _: NaturalTransformation.Reflect[_]) => that.asInstanceOf[E ~> G]
+    case _ => NaturalTransformation.Sequence(that, this)
+  }
 
   /** Symbolic alias for the `andThen` method, providing a compact notation for left-to-right composition.
     *
