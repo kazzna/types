@@ -10,7 +10,7 @@ ThisBuild / credentials ++= (sys.env.get("GITHUB_TOKEN") match {
 lazy val root = (project in file("."))
   .settings(
     name := "types",
-    version := "0.1.0-SNAPSHOT",
+    version := "0.1.0",
     scalacOptions ++= Seq(
       "--deprecation",
       "--feature",
