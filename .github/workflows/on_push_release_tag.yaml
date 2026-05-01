@@ -1,4 +1,4 @@
-name: Release on Tag
+name: Release Stable Version
 
 on:
   push:
