@@ -8,6 +8,8 @@ on:
 jobs:
   release:
     runs-on: ubuntu-24.04
+    env:
+      GITHUB_PACKAGES_MAVEN_URL: https://maven.pkg.github.com/${{ github.repository }}
 
     permissions:
       contents: write
@@ -26,6 +28,20 @@ jobs:
           java-version: 21.0.10+7.0.LTS
 
       - uses: sbt/setup-sbt@508b753e53cb6095967669e0911487d2b9bc9f41 # v1.1.22
+
+      - name: Create sbt credentials file
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$HOME/.sbt/1.0"
+          cat > "$HOME/.sbt/1.0/ghpackages.credentials" <<EOF
+          realm=GitHub Package Registry
+          host=maven.pkg.github.com
+          user=${{ github.repository_owner }}
+          password=$GITHUB_TOKEN
+          EOF
+          chmod 600 "$HOME/.sbt/1.0/ghpackages.credentials"
 
       - name: Validate tag version with build.sbt
         id: release_meta

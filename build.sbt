@@ -1,11 +1,11 @@
 ThisBuild / organization := "jp.kazzna"
 ThisBuild / scalaVersion := "3.8.3"
 ThisBuild / versionScheme := Some("early-semver")
-ThisBuild / publishTo := Some("GitHub Package Registry" at "https://maven.pkg.github.com/kazzna/types")
-ThisBuild / credentials ++= (sys.env.get("GITHUB_TOKEN") match {
-  case Some(token) => Seq(Credentials("GitHub Package Registry", "maven.pkg.github.com", "kazzna", token))
-  case None => Seq()
-})
+ThisBuild / publishTo := sys.env.get("GITHUB_PACKAGES_MAVEN_URL").map { url => 
+  "GitHub Package Registry" at url
+}
+ThisBuild / publish / skip := sys.env.get("GITHUB_ACTIONS") != Some("true")
+ThisBuild / credentials += Credentials(Path.userHome / ".sbt" / "1.0" / "ghpackages.credentials")
 
 lazy val root = (project in file("."))
   .settings(
