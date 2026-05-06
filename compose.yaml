@@ -5,4 +5,13 @@ services:
       - type: bind
         source: .
         target: /app
+      - type: bind
+        source: ~/.cache
+        target: /root/.cache
+      - type: bind
+        source: ~/.ivy2
+        target: /root/.ivy2
+      - type: bind
+        source: ~/.sbt
+        target: /root/.sbt
     working_dir: /app
