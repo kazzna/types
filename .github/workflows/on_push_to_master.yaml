@@ -87,7 +87,7 @@ jobs:
           SCOPE: users
           VERSION: ${{ steps.pkg_meta.outputs.version }}
         run: |
-          echo "Looking for package `$PACKAGE_NAME:$VERSION`"
+          echo "Looking for package \`$PACKAGE_NAME:$VERSION\`"
 
           PACKAGE_ID=$(gh api -H "Accept: application/vnd.github+json" \
             /$SCOPE/$OWNER/packages?package_type=$PACKAGE_TYPE \
