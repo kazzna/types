@@ -1,5 +1,5 @@
 ThisBuild / organization := "jp.kazzna"
-ThisBuild / scalaVersion := "3.8.4"
+ThisBuild / scalaVersion := "3.9.0"
 ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / publishTo := sys.env.get("GITHUB_PACKAGES_MAVEN_URL").map { url =>
   "GitHub Package Registry" at url
