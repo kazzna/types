@@ -13,7 +13,7 @@ jobs:
   publish-snapshot:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       GITHUB_PACKAGES_MAVEN_URL: https://maven.pkg.github.com/${{ github.repository }}
 
