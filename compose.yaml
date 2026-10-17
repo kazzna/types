@@ -1,6 +1,6 @@
 services:
   development:
-    image: sbtscala/scala-sbt:eclipse-temurin-alpine-21.0.12_8_1.13.0_2.12.21@sha256:6f4acfdfdfb6dc54754d4356c69967b373aaf6016ab568435c3bc11d1cb8851c
+    image: sbtscala/scala-sbt:eclipse-temurin-alpine-21.0.12_8_1.13.0_2.12.21@sha256:c34593f19929e0318a33c5b25c91d628b3ca8111fbe9b97dbf4a36188c4b8ef6
     volumes:
       - type: bind
         source: .
