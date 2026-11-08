@@ -15,7 +15,7 @@ jobs:
         with:
           distribution: temurin
           # renovate: datasource=java-version packageName=java
-          java-version: 21.0.12+101.0.LTS
+          java-version: 21.0.13+9.0.LTS
 
       - uses: sbt/setup-sbt@ecad189dd245444b9ae0a0cd5922fd938b88906f # v1.5.12
 
